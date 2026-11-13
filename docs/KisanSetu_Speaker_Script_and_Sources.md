@@ -1,12 +1,12 @@
 # KisanSetu: speaker script and sources
 
-Tech4Bharat 2026, Challenge 6.1. Target delivery: 6 to 8 minutes (about 35 seconds per slide). The same notes are embedded in the deck.
+Tech4Bharat 2026, Problem Statement 6.1. Target delivery: 6 to 8 minutes (about 35 seconds per slide). The same notes are embedded in the deck.
 
-## Slide 1: KisanSetu (title)
+## Slide 1: KisanSetu (cover)
 
 **Main message.** KisanSetu is a selling network for farmers, not another price-lookup app.
 
-**Say.** Good morning. We are presenting KisanSetu, our response to Challenge 6.1: farmers sell at the wrong time, place and price. Setu means bridge. KisanSetu is a bridge between a farmer's harvest and a better market. It is a network of coordinated AI agents that helps a farmer find, weigh up and carry out a better sale, and the farmer makes every decision.
+**Say.** Good morning. We are presenting KisanSetu, our response to Problem Statement 6.1: farmers sell at the wrong time, place and price. Setu means bridge. KisanSetu is a bridge between a farmer's harvest and a better market. It is a network of coordinated AI agents that helps a farmer find, weigh up and carry out a better sale, and the farmer makes every decision.
 
 **Transition.** To see why that matters, look at what selling actually involves for a small farmer.
 
@@ -28,11 +28,11 @@ Tech4Bharat 2026, Challenge 6.1. Target delivery: 6 to 8 minutes (about 35 secon
 
 **Technical clarification.** We do not claim that no existing platform offers any of these services. The claim is narrower: one shared agentic workflow that coordinates them. If asked: Agmarknet already publishes daily mandi prices and arrivals, and eNAM is the government e-trading platform linking APMC mandis. We build on that data; we do not replace it.
 
-## Slide 4: One intelligent network. From anticipated harvest to completed sale
+## Slide 4: One intelligent network, from anticipated harvest to completed sale
 
-**Main message.** KisanSetu is one workflow with eight connected services, and the farmer sits at the centre of it.
+**Main message.** KisanSetu is one workflow with eight connected services, and the farmer sits at the start and end of it.
 
-**Say.** A farmer tells KisanSetu four things, by voice, in their own language: what they are growing, how much, when it will be ready and where they are. From there the platform works through market intelligence, buyer matching, collective selling, logistics, storage choices and the transaction record. These are not eight apps. They are eight steps that share one view of the same harvest.
+**Say.** A farmer tells KisanSetu four things, by voice, in their own language: what they are growing, how much, when it will be ready and where they are. From there the platform works through market intelligence, buyer matching, collective selling, logistics, storage choices and the transaction record. These are not eight apps. They are eight steps that share one record of the same harvest.
 
 **Transition.** What turns eight services into one workflow is the agent layer.
 
@@ -48,7 +48,7 @@ Tech4Bharat 2026, Challenge 6.1. Target delivery: 6 to 8 minutes (about 35 secon
 
 **Technical clarification.** Not everything is an LLM. Arithmetic, cost estimation, matching constraints, aggregation and optimisation are deterministic code. The LLM handles intent, planning, tool selection, coordination, exceptions and conversation.
 
-## Slide 6: One farmer. One harvest. A coordinated selling journey
+## Slide 6: One farmer, one harvest, one coordinated selling journey
 
 **Main message.** Eight steps, five agents and one approval point take a harvest from registration to reconciled payment.
 
@@ -82,7 +82,7 @@ Tech4Bharat 2026, Challenge 6.1. Target delivery: 6 to 8 minutes (about 35 secon
 
 **Main message.** Five layers, with the model doing only what needs a model, data coming from outside systems, and people approving commitments.
 
-**Say.** This is the proposed build. At the top, role-specific interfaces, voice-first for farmers. Below that, ordinary backend services in FastAPI. In the middle, the orchestrator and seven agents, which talk through defined tools and a shared operational state rather than free-form chat. Layer four separates the two kinds of intelligence: green is the language model, white is conventional algorithms. At the bottom, PostgreSQL holds the operational record and a persistent memory of orders, decisions and approvals. On the right, two things sit deliberately outside the agents: external data sources, and human approval gates.
+**Say.** This is the proposed build. At the top, role-specific interfaces, voice-first for farmers. Below that, ordinary backend services in FastAPI. In the middle, the orchestrator and seven agents, which talk through defined tools and a shared operational state rather than free-form chat. Layer four separates the two kinds of intelligence: the shaded cells are the language model, the white cells are conventional algorithms. At the bottom, PostgreSQL holds the operational record and a persistent memory of orders, decisions and approvals. On the right, two things sit deliberately outside the agents: human approval gates, and external data sources.
 
 **Transition.** With the build credible, what should it change for farmers?
 
@@ -116,14 +116,12 @@ Tech4Bharat 2026, Challenge 6.1. Target delivery: 6 to 8 minutes (about 35 secon
 
 **Transition.** Open for questions. Likely ones: data sources for prices, what is real versus simulated in the prototype, and how approvals work.
 
-Spoken word count: about 978 words.
+Spoken word count: about 983 words.
 
 ## Sources
 
-**External data.** No market data, statistics or impact figures from outside sources appear on the slides. The slide 3 notes refer to two public services: Agmarknet (https://agmarknet.gov.in) for daily mandi prices and arrivals, and eNAM (https://enam.gov.in), the government e-trading platform linking APMC mandis. The tomato scenario (slide 6) and the price and cost figures (slide 7) are illustrative values from the project brief and are labelled as such on the slides.
+**External data.** No market data, statistics or impact figures from outside sources appear on the slides. The slide 3 notes refer to two public services: Agmarknet (https://agmarknet.gov.in) for daily mandi prices and arrivals, and eNAM (https://enam.gov.in), the government e-trading platform linking APMC mandis. The tomato scenario (slide 6) and the price and cost figures (slide 7) are illustrative values from the project brief and are labelled as such.
 
-**Images.** No photographs are used. All diagrams are native, editable PowerPoint shapes and one native chart.
+**Images and icons.** None. Every diagram is built from native, editable PowerPoint shapes, tables and one native chart.
 
-**Icons.** Font Awesome Free 5 (via the react-icons package), licensed CC BY 4.0, https://fontawesome.com. Embedded as PNG.
-
-**Fonts.** Arial (headings) and Calibri (body), both shipped with Microsoft Office.
+**Fonts.** Cambria (headings) and Calibri (body), both shipped with Microsoft Office.
