@@ -26,7 +26,7 @@ Tech4Bharat 2026, Challenge 6.1. Target delivery: 6 to 8 minutes (about 35 secon
 
 **Transition.** Here is what that connected workflow looks like as a product.
 
-**Technical clarification.** We do not claim that no existing platform offers any of these services. The claim is narrower: one shared agentic workflow that coordinates them.
+**Technical clarification.** We do not claim that no existing platform offers any of these services. The claim is narrower: one shared agentic workflow that coordinates them. If asked: Agmarknet already publishes daily mandi prices and arrivals, and eNAM is the government e-trading platform linking APMC mandis. We build on that data; we do not replace it.
 
 ## Slide 4: One intelligent network. From anticipated harvest to completed sale
 
@@ -42,7 +42,7 @@ Tech4Bharat 2026, Challenge 6.1. Target delivery: 6 to 8 minutes (about 35 secon
 
 **Main message.** Seven specialised agents work through one orchestrator and one shared state, with people approving anything consequential.
 
-**Say.** This is the core of the system. The orchestrator takes the farmer's goal, keeps the state of the selling workflow, hands tasks to seven specialised agents, checks what comes back and decides the next step. If the Buyer Matching Agent finds an order larger than the farmer can fill, the orchestrator asks the Collective Selling Agent to find the rest, then the Logistics Agent to price the delivery. That hand-off is what makes this agentic. Before any commitment, a person approves.
+**Say.** This is the core of the system. The orchestrator takes the farmer's goal, keeps the state of the selling workflow, hands tasks to seven specialised agents, checks what comes back and decides the next step. If the Buyer Matching Agent finds an order larger than the farmer can fill, the orchestrator asks the Collective Selling Agent to find the rest, then the Logistics Agent to price the delivery. That hand-off is what makes this agentic. If a buyer withdraws or a harvest comes in short, the orchestrator replans. Before any commitment, a person approves.
 
 **Transition.** Let us follow one harvest through those agents.
 
@@ -52,11 +52,11 @@ Tech4Bharat 2026, Challenge 6.1. Target delivery: 6 to 8 minutes (about 35 secon
 
 **Main message.** Eight steps, five agents and one approval point take a harvest from registration to reconciled payment.
 
-**Say.** Take a farmer in Gujarat expecting three thousand kilos of tomatoes in five days. She registers the harvest by voice. The Market Intelligence Agent compares nearby markets on net realisation. The Buyer Matching Agent finds a food processor that needs five thousand kilos in that window, which is more than she has. So the Collective Selling Agent looks for nearby farmers or an FPO to supply the other two thousand. The Logistics Agent plans one vehicle across the pickups. The orchestrator puts price, deductions, transport and expected proceeds into a single proposal. Nothing moves until each farmer approves their own share. Then dispatch, delivered quantities and payment are tracked.
+**Say.** Take a farmer in Gujarat expecting three thousand kilos of tomatoes in five days. She registers the harvest by voice. The Market Intelligence Agent compares nearby markets on net realisation. The Buyer Matching Agent finds a food processor that needs five thousand kilos in that window, which is more than she has. So the Collective Selling Agent looks for nearby farmers or an FPO to supply the other two thousand. The Logistics Agent plans one vehicle across the pickups. The orchestrator puts price, deductions, transport and expected proceeds into a single proposal. Nothing moves until each farmer approves their own share. Then dispatch, delivered quantities and payment are tracked. And if the processor pulls out on day three, the orchestrator replans from what is left and asks the farmers again.
 
 **Transition.** The step that changes the farmer's decision is the second one, so let us look at the numbers behind it.
 
-**Technical clarification.** This scenario is illustrative, not a completed transaction. In the prototype, every buyer demand or offer will be labelled as real, sourced or simulated.
+**Technical clarification.** This scenario is illustrative, not a completed transaction. In the prototype, every buyer demand or offer will be labelled as real, sourced or simulated. In a pooled sale each lot is weighed and graded separately and proceeds are split pro rata by accepted weight per grade.
 
 ## Slide 7: We optimise for what farmers actually earn, not just the price displayed on a screen
 
@@ -72,7 +72,7 @@ Tech4Bharat 2026, Challenge 6.1. Target delivery: 6 to 8 minutes (about 35 secon
 
 **Main message.** Every participant gets something useful, which is what gives each of them a reason to join the network.
 
-**Say.** A market-access network only works if every side has a reason to take part. Farmers get intelligence, buyers and bargaining power. FPOs get a tool to aggregate and coordinate their members. Buyers and processors get reliable supply matched to their requirements. Transporters get fuller vehicles. Storage operators see demand coming. Institutions get visibility into market access. KisanSetu sits in the middle moving four things: supply, demand, transport capacity and information.
+**Say.** A market-access network only works if every side has a reason to take part. Farmers get intelligence, buyers and bargaining power. FPOs get a tool to aggregate and coordinate their members, and they are where we start, because an FPO brings supply and a coordinator on day one. Buyers and processors get reliable supply matched to their requirements. Transporters get fuller vehicles. Storage operators see demand coming. Institutions get visibility into market access. KisanSetu sits in the middle moving four things: supply, demand, transport capacity and information.
 
 **Transition.** Now the question a technical judge will ask: how is this actually built?
 
@@ -116,11 +116,11 @@ Tech4Bharat 2026, Challenge 6.1. Target delivery: 6 to 8 minutes (about 35 secon
 
 **Transition.** Open for questions. Likely ones: data sources for prices, what is real versus simulated in the prototype, and how approvals work.
 
-Spoken word count: about 927 words.
+Spoken word count: about 978 words.
 
 ## Sources
 
-**External data.** None. No market data, statistics or impact figures from outside sources are used. The tomato scenario (slide 6) and the price and cost figures (slide 7) are illustrative values from the project brief and are labelled as such on the slides.
+**External data.** No market data, statistics or impact figures from outside sources appear on the slides. The slide 3 notes refer to two public services: Agmarknet (https://agmarknet.gov.in) for daily mandi prices and arrivals, and eNAM (https://enam.gov.in), the government e-trading platform linking APMC mandis. The tomato scenario (slide 6) and the price and cost figures (slide 7) are illustrative values from the project brief and are labelled as such on the slides.
 
 **Images.** No photographs are used. All diagrams are native, editable PowerPoint shapes and one native chart.
 

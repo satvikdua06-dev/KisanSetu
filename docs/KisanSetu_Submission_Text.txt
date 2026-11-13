@@ -1,0 +1,111 @@
+==================================================
+FIELD 1 - BRIEF ABOUT YOUR IDEA
+==================================================
+
+KisanSetu is an agentic AI market-access network that helps small and marginal farmers decide when, where and to whom to sell, and then helps them carry out that sale.
+
+Instead of only displaying mandi prices, KisanSetu compares selling options on expected net realisation (price minus transport, handling, fees and deductions), matches the harvest to buyer demand, pools small lots from nearby farmers into quantities larger buyers will take, and plans shared transport. A central orchestrator coordinates seven specialised agents over one shared record of the harvest, and replans when a buyer withdraws, a vehicle becomes unavailable or the harvest falls short.
+
+Farmers use it by voice in their own language, with support from their FPO. Every sale, price and settlement needs the farmer's explicit approval. We enter through Farmer Producer Organisations, starting with one crop in one district.
+
+
+==================================================
+FIELD 2 - DETAILED EXPLANATION OF THE IDEA
+==================================================
+
+KISANSETU - AN AGENTIC AI-POWERED AGRICULTURAL MARKET ACCESS AND INTELLIGENT SELLING NETWORK
+
+1. PROBLEM OVERVIEW
+
+Small and marginal farmers sell at the wrong time, place and price because six constraints act together: limited visibility of net prices across markets, quantities too small to interest larger buyers, dependence on a narrow set of local buyers, transport costs that can cancel out a better price, perishability that forces a quick sale, and transactions with unclear deductions and delayed payment.
+
+These constraints are linked. Knowing that another mandi pays more does not help a farmer who cannot afford the transport, cannot find a buyer there, or cannot supply the quantity that buyer wants. Solving any one in isolation rarely changes what the farmer finally earns.
+
+2. WHAT EXISTS TODAY AND WHERE THE GAP IS
+
+Public price information is already available. Agmarknet publishes daily minimum, maximum and modal prices and arrivals by market and commodity, and eNAM is the government's electronic trading platform that links APMC mandis. Private agri-marketplaces and advisory apps also offer price feeds, buyer listings and input services.
+
+We do not claim these services are missing. The gap is that each stops at information or at a single step, and the farmer is left to connect price, buyer, quantity and transport alone. KisanSetu's contribution is the coordination layer: one workflow that takes a harvest from registration to reconciled payment, using existing public data wherever it is available.
+
+3. PROPOSED SOLUTION
+
+KisanSetu is a multi-agent platform covering the selling lifecycle from anticipated harvest to payment reconciliation. A farmer reports the crop, expected quantity, harvest date, location and quality by voice. A central orchestrator then coordinates specialised agents that compare markets on net realisation, find matching buyer demand, pool supply with other farmers, plan transport and track the transaction.
+
+The system does not dictate a selling decision. It prepares a comparative proposal that shows price, costs, deductions, assumptions and uncertainty, and the farmer chooses.
+
+4. CORE AGENTS
+
+A. Crop and Harvest Intelligence Agent. Maintains crop, area, expected quantity and harvest dates. It also detects supply concentration: when many farmers in an area expect the same crop in the same week, it issues an early surplus alert to farmers and their FPO. This addresses the "wrong time" part of the problem directly and needs no buyer-side integration.
+
+B. Market Intelligence Agent. Uses available mandi prices, arrivals and historical trends to compare nearby and regional markets. It calculates estimated net realisation after transport, handling, market fees and other applicable costs, and gives indicative price ranges, never a single guaranteed figure.
+
+C. Buyer Matching Agent. Buyers (wholesalers, retailers, food processors, restaurants and institutional purchasers) publish requirements for crop, variety, quantity, quality and delivery window. The agent matches farmer supply to these requirements and prepares offers for comparison.
+
+D. Collective Selling Agent. Finds nearby farmers with compatible crop, quality and harvest dates and pools their lots into a commercially viable quantity. It compares the collective option against selling individually for each farmer.
+
+E. Logistics Agent. Matches vehicle capacity to shipments, estimates transport cost, plans pickups and delivery, and looks for shared loads across nearby farmers.
+
+F. Storage Decision Agent. Compares selling now with storing and selling later, taking into account perishability, quality loss, storage cost and uncertainty in future prices. It presents both alternatives with their risks and does not recommend storage on a point forecast.
+
+G. Transaction and Trust Agent. Records agreed price, quantity, quality and delivery terms, tracks dispatch, delivery and payment status, issues digital receipts and keeps an auditable record, including any discrepancy between agreed and delivered quantities.
+
+5. AGENTIC COORDINATION AND REPLANNING
+
+The agents work through a central orchestrator with shared operational state and persistent memory of orders, decisions and approvals. They are steps in one workflow, not independent tools.
+
+Illustrative flow: a farmer registers 3,000 kg of tomatoes due in five days. The Market Intelligence Agent compares net realisation across markets. The Buyer Matching Agent finds a processor requirement for 5,000 kg. The Collective Selling Agent finds the remaining 2,000 kg from nearby farmers or an FPO. The Logistics Agent plans one vehicle across the pickups. The orchestrator assembles a proposal, each farmer approves their own commitment, and the Transaction and Trust Agent tracks delivery and payment.
+
+Replanning is the core of the agentic design. If the buyer withdraws, a transporter becomes unavailable or a farmer reports a smaller harvest, the orchestrator re-evaluates the remaining options, produces a revised proposal and asks the affected farmers to approve again. Nothing committed earlier is changed without consent. This scenario is the centrepiece of our prototype demonstration.
+
+Not every component is an LLM. The language model handles intent understanding, planning, tool selection, exception handling and conversation. Price arithmetic, cost estimation, matching, aggregation and routing are deterministic or constraint-based algorithms.
+
+6. RULES FOR COLLECTIVE SELLING
+
+Each farmer's lot is weighed, graded and recorded separately, even when sold together. Proceeds are split pro rata by the weight the buyer accepts in each grade, at that grade's price. Shared costs such as transport are split by weight carried. If a farmer delivers less than committed, their share falls accordingly and the shortfall is handled through replanning, not passed on to the other farmers. A rejected or downgraded lot affects only the farmer who supplied it. Every farmer sees their own expected proceeds before approving and their own settlement summary afterwards.
+
+7. ENTRY STRATEGY: FPO-FIRST
+
+A market-access network has a cold-start problem: buyers will not join without supply, and farmers will not join without buyers. We enter through Farmer Producer Organisations. An FPO already aggregates members, has a coordinator who can assist farmers with low digital literacy, and can offer buyers a meaningful quantity from the first day. The FPO is the first institutional customer and the operator of the collective-selling workflow; individual farmers use the voice interface directly or through the coordinator.
+
+8. PROTOTYPE SCOPE
+
+The prototype covers one perishable crop in one district. Built as working software: harvest registration by voice, net-realisation comparison, buyer matching, aggregation, the approval step and replanning. Represented by clearly labelled simulations: buyer requirements, transporter availability, storage facilities and payment confirmation. Every price, demand or offer shown is tagged as observed, historical, forecast or simulated, with its source and date.
+
+9. DATA AND THE NET-REALISATION MODEL
+
+Net realisation per kg = expected price - transport - handling - market fees - expected quality deductions. Prices come from public mandi data where available, shown with their date so that stale data is visible. Transport cost is computed from distance and vehicle capacity; other cost components are either supplied by the FPO or marked as assumptions. Estimates are presented as ranges.
+
+Illustrative example: a local mandi quoting Rs 20/kg with Rs 1 costs nets Rs 19; a regional mandi at Rs 24 with Rs 3 costs nets Rs 21; a distant market at Rs 27 with Rs 6 costs also nets Rs 21. The highest quoted price is not the highest earning.
+
+10. STAKEHOLDERS
+
+Farmers: net-realisation comparisons, buyer access, collective bargaining and transparent records.
+FPOs and cooperatives: aggregation, member coordination, bulk selling and supply visibility.
+Buyers and food processors: supplier discovery, matched procurement and fulfilment coordination.
+Transporters: freight discovery and better vehicle utilisation.
+Storage operators: visibility of upcoming produce and storage demand.
+Agricultural institutions and field coordinators: visibility of market access and participation.
+
+11. ACCESSIBILITY AND INCLUSION
+
+Voice-first interaction in the farmer's language, audio confirmation of every commitment, and simple screens. For low or intermittent connectivity, alerts and approvals fall back to SMS and voice calls, and FPO coordinators can act on a farmer's instruction with the farmer's confirmation recorded.
+
+12. RESPONSIBLE DESIGN
+
+Recommendations are explained and can be rejected. No price increase is guaranteed. Farmer location and financial information is shared with a buyer only with consent. KisanSetu records payment status but does not hold or move farmers' money; settlement happens between the parties through their existing channels. All transactions keep an auditable record.
+
+13. INTENDED IMPACT AND MEASUREMENT
+
+Intended outcomes: higher net realisation, stronger bargaining power through collective supply, lower avoidable transport cost, more transparent transactions and wider market participation for small farmers.
+
+These are targets, not results. We will measure: change in net realisation per kg, number of farmers accessing new buyers, volume sold collectively, transport cost per kg, share of transactions completed, average payment reconciliation time, and farmer repeat usage, compared against a baseline for the same crop and season.
+
+14. PROPOSED TECHNOLOGY
+
+Mobile-first frontend and stakeholder dashboards in React / Next.js. Backend services in Python FastAPI. PostgreSQL for farmers, crops, buyers, offers, orders, logistics and transactions. A stateful orchestration layer coordinating agents, tool calls, approvals and retries. An LLM for language understanding and planning. Deterministic and constraint-based algorithms for matching, aggregation, cost comparison and routing. Speech-to-text and text-to-speech for voice. External data through supported APIs, or clearly labelled simulations where no API is available.
+
+15. LONG-TERM VISION
+
+Start with one crop and one district, validate with farmers and an FPO, add local buyers and transporters, then extend to more crops, neighbouring markets and further FPOs. The aim is a trusted market-access network that connects fragmented supply with organised demand.
+
+Every farmer should have access to the market intelligence, buyers, bargaining power and coordination needed to obtain a fair and informed return for their produce.
