@@ -63,7 +63,7 @@ We host the agent loop ourselves (Claude API + tool use) rather than using Anthr
 |---|---|
 | Speech-to-text and text-to-speech in Indian languages | Behind a `speech` adapter. Candidates: **Bhashini** (Government of India language platform) and **Sarvam AI**. Choose after testing both on the prototype region's language (Gujarati for the tomato scenario). |
 | SMS, voice-call (IVR) fallback, OTP | Behind a `messaging` adapter. Candidates: **Exotel** or **Twilio**. |
-| Mandi prices and arrivals | **Agmarknet data through the data.gov.in open-data API**, ingested daily into Postgres with source and date on every row. Verify the dataset and access terms before building the ingester. |
+| Mandi prices and arrivals | **Plug-and-play price sources** ([design](design/market-price-sources.md)): any API, external database or file is registered by config (endpoint, auth secret name, pagination, field mapping) and loads into one `price_observation` table with source and date on every row. First source: Agmarknet data through the data.gov.in open-data API (verify the dataset and terms before enabling). |
 | Distances and routes | **OSRM on OpenStreetMap India data** (self-hosted, no per-call cost). |
 | Simulated data | Buyer requirements, transporter availability, storage and payment confirmation are **seeded simulations**, tagged `simulated` in the database and shown as such in the UI. |
 

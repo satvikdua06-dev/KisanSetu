@@ -142,7 +142,7 @@ Full decision record with reasons and rejected options: [docs/STACK.md](docs/STA
 | AI | Claude Opus 5.5 (orchestrator), Claude Haiku 5.5 (high-volume intent parsing) |
 | Optimisation | Google OR-Tools (matching, aggregation, routing) |
 | Voice and messaging | Indic speech-to-text and text-to-speech, SMS and voice-call fallback, behind adapters |
-| Data | Agmarknet prices via data.gov.in; OSRM on OpenStreetMap; labelled simulations elsewhere |
+| Data | Plug-and-play price sources: add any API or database by config ([design](docs/design/market-price-sources.md)); Agmarknet via data.gov.in first; OSRM on OpenStreetMap; labelled simulations elsewhere |
 | Infrastructure | Docker; AWS Mumbai region in production; GitHub Actions; EAS for mobile builds |
 
 ## Accessibility and inclusion
@@ -176,6 +176,7 @@ Target metrics for future evaluation, not results, compared against a baseline f
 | Path | Contents |
 |---|---|
 | `docs/STACK.md` | Tech stack decision record |
+| `docs/design/market-price-sources.md` | Design: plug-and-play market price sources |
 | `docs/KisanSetu_Pitch_Deck.pdf` | Pitch deck (PDF) |
 | `docs/KisanSetu_Pitch_Deck.pptx` | Pitch deck (editable, with speaker notes) |
 | `docs/KisanSetu_Speaker_Script_and_Sources.md` | Speaker script and sources |
