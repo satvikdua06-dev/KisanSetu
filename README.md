@@ -138,8 +138,9 @@ Full decision record with reasons and rejected options: [docs/STACK.md](docs/STA
 | Shared code | pnpm + Turborepo monorepo; typed API client generated from the backend's OpenAPI schema |
 | Backend | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic |
 | Database | PostgreSQL 16 + PostGIS; Redis for cache and queues |
-| Orchestration | Workflow state in Postgres; ARQ background workers; human approval as a workflow state |
-| AI | Claude Opus 5.5 (orchestrator), Claude Haiku 5.5 (high-volume intent parsing) |
+| Agents | Orchestrator + 7 autonomous specialist agents, each with its own prompt, tools, loop and memory ([design](docs/design/multi-agent-architecture.md)) |
+| Orchestration | Shared workflow state and agent message log in Postgres; ARQ background workers; human approval as a workflow state |
+| AI | Claude Opus 5.5, Sonnet 5.5 and Haiku 5.5, chosen per agent |
 | Optimisation | Google OR-Tools (matching, aggregation, routing) |
 | Voice and messaging | Indic speech-to-text and text-to-speech, SMS and voice-call fallback, behind adapters |
 | Data | Plug-and-play price sources: add any API or database by config ([design](docs/design/market-price-sources.md)); Agmarknet via data.gov.in first; OSRM on OpenStreetMap; labelled simulations elsewhere |
@@ -176,6 +177,7 @@ Target metrics for future evaluation, not results, compared against a baseline f
 | Path | Contents |
 |---|---|
 | `docs/STACK.md` | Tech stack decision record |
+| `docs/design/multi-agent-architecture.md` | Design: orchestrator and seven specialist agents |
 | `docs/design/market-price-sources.md` | Design: plug-and-play market price sources |
 | `docs/KisanSetu_Pitch_Deck.pdf` | Pitch deck (PDF) |
 | `docs/KisanSetu_Pitch_Deck.pptx` | Pitch deck (editable, with speaker notes) |

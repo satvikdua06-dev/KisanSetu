@@ -1,5 +1,27 @@
 # KisanSetu — working rules
 
+## Core objectives (read first, every task)
+
+KisanSetu is a **multi-agent agentic AI market-access network** for Tech4Bharat 2026, Problem Statement 6.1: *farmers sell at the wrong time, place and price.* Every design, document and line of code must serve these objectives. They are not trade-offs to make quietly.
+
+1. **Problem 6.1 first.** Everything exists to help small and marginal farmers sell at a better time, place and price. Logistics, storage and buyer discovery are supporting parts of that, never separate products.
+2. **Genuinely multi-agent.** One Orchestrator plus seven autonomous specialist agents (Crop and Harvest, Market Intelligence, Buyer Matching, Collective Selling, Logistics, Storage Decision, Transaction and Trust). Each specialist is its own Claude agent with its own prompt, tools, loop, memory and output schema. The Orchestrator delegates goals, specialists can escalate, and the system replans. Never collapse the agents into functions or tools of one model. Source: `docs/design/multi-agent-architecture.md`.
+3. **Net realisation, computed by code.** Options are ranked by what the farmer actually earns after costs, with ranges and dated sources. Prices, costs, matching and routing come from deterministic code; the LLM never invents a number.
+4. **The farmer decides.** Every sale, collective participation, transport booking and settlement needs that farmer's explicit approval, enforced by the workflow, not by an agent's choice. Consent before sharing farmer data.
+5. **Honest about data and maturity.** Every price, demand or offer is labelled observed, historical, forecast or simulated, with source and date. Never claim results, users, partners or accuracy we don't have.
+6. **Built for real farmers.** Voice-first in their language, works offline and over SMS or voice calls, FPO coordinator can assist. One codebase for Android, iOS and web.
+7. **Plug-and-play data.** Price sources are added by configuration, not code (`docs/design/market-price-sources.md`).
+
+Sources of truth, in order: this section, `docs/design/multi-agent-architecture.md`, `docs/STACK.md`, `docs/design/*`, `README.md`, `docs/KisanSetu_Submission_Text.txt`.
+
+### Drift check (mandatory)
+
+Before finishing any task that changes design, docs or code, check the result against each objective above and say in the reply that you did. If a choice would weaken any objective, even to save cost, time or complexity:
+
+- **stop and ask the user first**, stating which objective it touches and what the alternative costs;
+- never make that trade silently or bury it in wording (for example describing agents as "tools the orchestrator calls");
+- if you find existing drift in the repo, flag it and propose the fix rather than building on top of it.
+
 ## Live design board
 
 Live FigJam board: https://www.figma.com/board/ss0wK9DgPvP7g5XYQNYfxG

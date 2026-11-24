@@ -47,15 +47,20 @@
 | Optimisation | **Google OR-Tools** | CP-SAT for matching and aggregation constraints, routing solver for pickups and vehicle loads. |
 | Auth | **Phone number + OTP, JWT access tokens, role-based access in Postgres** (farmer, FPO coordinator, buyer, transporter, admin) | Farmers don't use email or passwords. Every query is scoped to the caller's FPO or organisation. |
 
-### AI layer
+### AI layer: a real multi-agent system
+
+Full design: [docs/design/multi-agent-architecture.md](design/multi-agent-architecture.md).
 
 | Concern | Choice |
 |---|---|
-| Orchestrator (planning, tool selection, exceptions, replanning) | **Claude Opus 5.5** (`claude-opus-5-5`) via the official `anthropic` Python SDK, with tool use and adaptive thinking. |
-| High-volume, simple calls (intent parsing of transcribed speech, slot filling, short replies) | **Claude Haiku 5.5** (`claude-haiku-5-5`). |
-| How agents run | The seven agents are **tools and sub-steps the orchestrator calls**; the loop runs in our ARQ workers, and every step reads and writes the Postgres workflow state. Human approval is a workflow state, never something the model can skip. |
+| Agents | **Eight Claude agents**: one Orchestrator plus seven autonomous specialists (Crop and Harvest, Market Intelligence, Buyer Matching, Collective Selling, Logistics, Storage Decision, Transaction and Trust). Each has its own system prompt, tools, tool-use loop, memory and structured output schema. |
+| Delegation | The Orchestrator delegates **goals** with constraints and acceptance criteria; specialists choose their own steps, return results with confidence and sources, and can **escalate**. Independent goals run in parallel. |
+| Communication | Shared workflow state (blackboard) and an `agent_message` log in Postgres: tasks, results, escalations, questions, external events. The log is the audit trail and the agent-trace view. |
+| Models (per agent, configurable) | **Claude Opus 5.5** for the Orchestrator, Collective Selling and Storage Decision; **Claude Sonnet 5.5** for Market Intelligence, Buyer Matching, Logistics, Transaction and Trust; **Claude Haiku 5.5** for Crop and Harvest intake. Official `anthropic` Python SDK, tool use with strict schemas, structured outputs. |
+| Runtime | Each agent run is an ARQ background job; workflows persist in Postgres and resume on events, so they can wait days for approvals. |
+| Guardrails | Numbers come only from deterministic tools; commitments only through human approval states; consent checks inside tools; per-run budgets; escalation to the FPO coordinator when agents can't resolve something. |
 
-We host the agent loop ourselves (Claude API + tool use) rather than using Anthropic's hosted Managed Agents, because the workflow must pause for days on farmer approvals, persist in our database, and sit next to our deterministic tools. This can be revisited.
+We host the agent loops ourselves (Claude API + tool use) rather than Anthropic's hosted Managed Agents, because the workflows must pause for days on farmer approvals, persist in our database, and sit next to our deterministic tools. This can be revisited.
 
 ### Voice, messaging and external data
 
@@ -88,7 +93,8 @@ apps/
   web/               Next.js: FPO, buyer, transporter dashboards
 services/
   api/               FastAPI app, domain modules, ARQ workers, Alembic migrations
-    app/agents/      orchestrator + seven agents (tools around deterministic code)
+    app/agents/      orchestrator + seven specialist agents (prompt, tools, output schema each)
+    app/tools/       deterministic tools the agents call (prices, net realisation, matching, routing)
     app/domain/      farmers, harvests, markets, buyers, lots, logistics, transactions
     app/adapters/    speech, messaging, market data, maps
 packages/
@@ -113,5 +119,6 @@ docs/
 | Separate native Kotlin and Swift apps | Two codebases to build and keep in step; too slow for a small team. |
 | Web-only PWA | Weaker offline storage, background sync and push on iOS, and no store presence. Expo still gives us a web build. |
 | Node.js backend | The optimisation (OR-Tools), data and AI tooling we need is strongest in Python. |
-| An LLM agent framework holding the workflow state | Selling workflows wait days on approvals and need audit trails; we keep the state in our own Postgres tables and call Claude per step. |
+| An LLM agent framework holding the workflow state | Selling workflows wait days on approvals and need audit trails; we keep the state in our own Postgres tables and run each agent's loop per task. |
+| One agent with seven tool groups | Cheaper, but no specialised instructions or memory per domain, no parallel sub-goals, no per-agent accountability, and it is the "chatbot with labels" the project promises not to be. |
 | Microservices from day one | Adds network and deployment cost before we have the load to justify it. Modular monolith first. |
