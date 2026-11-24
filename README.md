@@ -127,18 +127,23 @@ One perishable crop in one district.
 
 Human approval gates sit outside the agents: selling commitments, negotiated agreements, collective participation, settlements. Market data comes from external systems, not from the model.
 
-### Proposed stack
+### Stack
+
+Full decision record with reasons and rejected options: [docs/STACK.md](docs/STACK.md).
 
 | Layer | Technology |
 |---|---|
-| Frontend | React / Next.js, mobile-first |
-| Backend | Python FastAPI |
-| Database | PostgreSQL |
-| Orchestration | Stateful agent layer with tool calls, approvals, retries |
-| AI | LLM for language understanding, planning, coordination |
-| Optimisation | Deterministic and constraint-based algorithms |
-| Voice | Speech-to-text and text-to-speech |
-| Integrations | Market data, maps, notifications via supported APIs or labelled simulations |
+| Farmer app | Expo (React Native), TypeScript: one codebase for Android, iOS and web; offline-first |
+| Dashboards | Next.js (FPO, buyer, transporter) |
+| Shared code | pnpm + Turborepo monorepo; typed API client generated from the backend's OpenAPI schema |
+| Backend | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic |
+| Database | PostgreSQL 16 + PostGIS; Redis for cache and queues |
+| Orchestration | Workflow state in Postgres; ARQ background workers; human approval as a workflow state |
+| AI | Claude Opus 5.5 (orchestrator), Claude Haiku 5.5 (high-volume intent parsing) |
+| Optimisation | Google OR-Tools (matching, aggregation, routing) |
+| Voice and messaging | Indic speech-to-text and text-to-speech, SMS and voice-call fallback, behind adapters |
+| Data | Agmarknet prices via data.gov.in; OSRM on OpenStreetMap; labelled simulations elsewhere |
+| Infrastructure | Docker; AWS Mumbai region in production; GitHub Actions; EAS for mobile builds |
 
 ## Accessibility and inclusion
 
@@ -170,6 +175,7 @@ Target metrics for future evaluation, not results, compared against a baseline f
 
 | Path | Contents |
 |---|---|
+| `docs/STACK.md` | Tech stack decision record |
 | `docs/KisanSetu_Pitch_Deck.pdf` | Pitch deck (PDF) |
 | `docs/KisanSetu_Pitch_Deck.pptx` | Pitch deck (editable, with speaker notes) |
 | `docs/KisanSetu_Speaker_Script_and_Sources.md` | Speaker script and sources |
