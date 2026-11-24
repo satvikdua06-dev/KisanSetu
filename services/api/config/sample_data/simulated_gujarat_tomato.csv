@@ -1,0 +1,4 @@
+State,District,Market,Commodity,Date,Min (Rs/qtl),Max (Rs/qtl),Modal (Rs/qtl)
+Gujarat,Anand,Anand,Tomato,2026-11-23,1800,2200,2000
+Gujarat,Ahmedabad,Ahmedabad,Tomato,2026-11-23,2100,2700,2400
+Gujarat,Surat,Surat,Tomato,2026-11-23,2400,3000,2700

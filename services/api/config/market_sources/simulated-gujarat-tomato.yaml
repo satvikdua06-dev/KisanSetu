@@ -1,0 +1,17 @@
+# Simulated prototype prices. Labelled 'simulated' everywhere they appear.
+name: simulated-gujarat-tomato
+connector: file
+data_kind: simulated
+priority: 900
+enabled: true
+request:
+  path: config/sample_data/simulated_gujarat_tomato.csv
+mapping:
+  state:       { from: State }
+  district:    { from: District }
+  market:      { from: Market }
+  commodity:   { from: Commodity }
+  date:        { from: Date, parse: date }
+  min_price:   { from: Min (Rs/qtl), parse: number, unit: INR_per_quintal }
+  max_price:   { from: Max (Rs/qtl), parse: number, unit: INR_per_quintal }
+  modal_price: { from: Modal (Rs/qtl), parse: number, unit: INR_per_quintal }

@@ -1,0 +1,38 @@
+# Agmarknet daily mandi prices via the data.gov.in open-data API.
+# DISABLED until the resource ID and field names are checked against the live dataset.
+name: agmarknet-datagovin
+connector: http_json
+data_kind: observed
+priority: 10
+schedule: "30 20 * * *"   # daily, 20:30 IST
+enabled: false
+request:
+  url: https://api.data.gov.in/resource/REPLACE-WITH-RESOURCE-ID
+  params:
+    format: json
+    filters[state]: Gujarat
+  auth:
+    type: query_param
+    name: api-key
+    secret: DATAGOVIN_API_KEY
+  pagination:
+    type: offset
+    offset_param: offset
+    limit_param: limit
+    page_size: 500
+  records_path: $.records
+mapping:
+  state:       { from: state }
+  district:    { from: district }
+  market:      { from: market }
+  commodity:   { from: commodity }
+  variety:     { from: variety }
+  grade:       { from: grade }
+  date:        { from: arrival_date, parse: date, format: "%d/%m/%Y" }
+  min_price:   { from: min_price, parse: number, unit: INR_per_quintal }
+  max_price:   { from: max_price, parse: number, unit: INR_per_quintal }
+  modal_price: { from: modal_price, parse: number, unit: INR_per_quintal }
+incremental:
+  watermark_field: date
+  param: filters[arrival_date]
+  format: "%d/%m/%Y"
