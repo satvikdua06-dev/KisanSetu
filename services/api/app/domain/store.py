@@ -35,6 +35,11 @@ class Lot:
     grade: str
     ready_date: date
     status: str = "available"  # available | committed | delivered
+    committed_kg: float = 0.0  # reserved by drafted agreements; released if they are voided
+
+    @property
+    def available_kg(self) -> float:
+        return max(0.0, self.quantity_kg - self.committed_kg)
 
 
 @dataclass

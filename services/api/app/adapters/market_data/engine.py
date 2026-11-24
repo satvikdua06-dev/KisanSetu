@@ -11,7 +11,7 @@ import httpx
 import yaml
 
 from app.adapters.market_data.aliases import AliasResolver
-from app.adapters.market_data.connectors import ConnectorConfigError, ConnectorContext, get_connector
+from app.adapters.market_data.connectors import ConnectorContext, get_connector
 from app.adapters.market_data.mapping import MappingError, map_record
 from app.adapters.market_data.models import (
     IngestResult,
@@ -19,7 +19,7 @@ from app.adapters.market_data.models import (
     SourceConfig,
     UnmatchedRecord,
 )
-from app.adapters.market_data.secrets import EnvSecretReader, MissingSecretError, SecretReader
+from app.adapters.market_data.secrets import EnvSecretReader, RecordingSecretReader, SecretReader
 
 
 def load_source_file(path: str | Path) -> SourceConfig:
@@ -41,7 +41,8 @@ async def run_source(
     http_transport: httpx.AsyncBaseTransport | None = None,
 ) -> IngestResult:
     result = IngestResult(source=config.name)
-    ctx = ConnectorContext(secrets=secrets or EnvSecretReader(), http_transport=http_transport)
+    recording = RecordingSecretReader(secrets or EnvSecretReader())
+    ctx = ConnectorContext(secrets=recording, http_transport=http_transport)
     fetched_at = datetime.now(UTC)
     try:
         connector = get_connector(config.connector)
@@ -69,8 +70,11 @@ async def run_source(
             result.observations.append(obs)
             if result.new_watermark is None or obs.date > result.new_watermark:
                 result.new_watermark = obs.date
-    except (ConnectorConfigError, MissingSecretError, httpx.HTTPError) as exc:
-        result.error = f"{type(exc).__name__}: {exc}"
+    except Exception as exc:  # a failing source must never crash the scheduler or other sources
+        # Scrub secret values (API keys end up in URLs of HTTP errors) before the error is stored or shown.
+        result.error = recording.redact(f"{type(exc).__name__}: {exc}")
+        for rejected in result.rejected:
+            rejected.reason = recording.redact(rejected.reason)
     return result
 
 

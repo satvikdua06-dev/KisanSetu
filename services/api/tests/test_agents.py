@@ -32,12 +32,16 @@ def task(agent, goal):
     return {"agent": agent, "goal": goal, "constraints": [], "acceptance_criteria": []}
 
 
-def proposal(farmer_kg, net_total):
-    return {"summary": "Sell to processor at INR 25/kg", "sell_to": "Simulated Tomato Processor", "quantity_kg": farmer_kg,
+def proposal(farmer_kg, net_total, lot_id="lot-asha", **overrides):
+    p = {"summary": "Sell to processor at INR 25/kg", "sell_to": "Simulated Tomato Processor",
+            "price_basis": "buyer:req-processor", "lot_id": lot_id, "quantity_kg": farmer_kg,
             "expected_price_per_kg": 25.0, "net_per_kg_low": 23.4, "net_per_kg_expected": 23.4, "net_per_kg_high": 23.4,
-            "expected_net_total_inr": net_total, "transport_cost_per_kg": 0.6, "deductions_note": "grade checked at pickup",
+            "expected_net_total_inr": net_total, "transport_cost_per_kg": 0.6, "other_costs_per_kg": 1.0,
+            "deductions_note": "grade checked at pickup",
             "pickup_date": READY, "alternative_considered": "Ahmedabad APMC, about INR 22.6/kg net",
             "data_kinds": ["simulated buyer demand", "simulated mandi prices 2026-11-23"]}
+    p.update(overrides)
+    return p
 
 
 def market_finish(messages):
@@ -76,8 +80,8 @@ def build_script():
             call_tools(("delegate", {"tasks": [task("collective_selling", "Fill 2,000 kg shortfall for the processor")]})),
             call_tools(("delegate", {"tasks": [task("logistics", "One vehicle for the pooled pickups to the processor")]})),
             call_tools(("request_approval", {"farmer_id": "farmer-asha", "proposal": proposal(3000, 70200)}),
-                       ("request_approval", {"farmer_id": "farmer-ravi", "proposal": proposal(1200, 28080)}),
-                       ("request_approval", {"farmer_id": "farmer-meena", "proposal": proposal(800, 18720)})),
+                       ("request_approval", {"farmer_id": "farmer-ravi", "proposal": proposal(1200, 28080, "lot-ravi")}),
+                       ("request_approval", {"farmer_id": "farmer-meena", "proposal": proposal(800, 18720, "lot-meena")})),
             orchestrator_status("awaiting_approval", "Proposals sent to three farmers"),
             # resumed after approvals
             call_tools(("delegate", {"tasks": [task("transaction_and_trust", "Draft agreements for approved farmers")]})),
@@ -115,12 +119,9 @@ def build_script():
             finish(logistics_finish),
         ],
         "transaction_and_trust": [
-            call_tools(("create_agreement_draft", {"farmer_id": "farmer-asha", "counterparty": "Simulated Tomato Processor",
-                                                   "quantity_kg": 3000, "price_per_kg": 25.0, "pickup_date": READY}),
-                       ("create_agreement_draft", {"farmer_id": "farmer-ravi", "counterparty": "Simulated Tomato Processor",
-                                                   "quantity_kg": 1200, "price_per_kg": 25.0, "pickup_date": READY}),
-                       ("create_agreement_draft", {"farmer_id": "farmer-meena", "counterparty": "Simulated Tomato Processor",
-                                                   "quantity_kg": 800, "price_per_kg": 25.0, "pickup_date": READY})),
+            call_tools(("create_agreement_draft", {"farmer_id": "farmer-asha"}),
+                       ("create_agreement_draft", {"farmer_id": "farmer-ravi"}),
+                       ("create_agreement_draft", {"farmer_id": "farmer-meena"})),
             finish(lambda messages: report(summary="Agreements drafted", result={
                 "agreement_ids": [r["agreement"]["id"] for r in last_tool_results(messages) if "agreement" in r],
                 "discrepancies": [r["raw"] for r in last_tool_results(messages) if "raw" in r]})),
@@ -168,7 +169,7 @@ async def test_tomato_scenario_multi_agent(runtime: Runtime):
 
     # Farmers approve; the Orchestrator resumes and Transaction and Trust drafts the agreements.
     for a in list(wf.pending_approvals()):
-        await runtime.decide_approval(wf.id, a.id, approved=True)
+        await runtime.decide_approval(wf.id, a.id, approved=True, decided_by=a.farmer_id)
     assert len(runtime.store.agreements) == 3
     assert all(a["approval_id"] for a in runtime.store.agreements.values())
 
@@ -191,8 +192,7 @@ async def test_agreement_tool_refuses_without_approval():
             orchestrator_status("in_progress", "tried"),
         ],
         "transaction_and_trust": [
-            call_tools(("create_agreement_draft", {"farmer_id": "farmer-asha", "counterparty": "X", "quantity_kg": 100,
-                                                   "price_per_kg": 20.0, "pickup_date": READY})),
+            call_tools(("create_agreement_draft", {"farmer_id": "farmer-asha"})),
             finish(lambda messages: report(status="failed", summary="Refused: farmer has not approved",
                                            result={"agreement_ids": [], "discrepancies": []})),
         ],

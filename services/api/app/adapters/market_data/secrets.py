@@ -22,6 +22,25 @@ class EnvSecretReader:
         return value
 
 
+class RecordingSecretReader:
+    """Wraps a reader and remembers every value handed out, so errors can be scrubbed before they are shown."""
+
+    def __init__(self, inner: SecretReader):
+        self._inner = inner
+        self.values: set[str] = set()
+
+    def get(self, name: str) -> str:
+        value = self._inner.get(name)
+        self.values.add(value)
+        return value
+
+    def redact(self, text: str) -> str:
+        for value in sorted(self.values, key=len, reverse=True):
+            if value:
+                text = text.replace(value, "***")
+        return text
+
+
 class DictSecretReader:
     """For tests and dry runs."""
 

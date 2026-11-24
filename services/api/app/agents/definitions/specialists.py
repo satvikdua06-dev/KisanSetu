@@ -57,10 +57,18 @@ async def record_harvest(ctx: ToolContext, a: RecordHarvestInput) -> dict:
 
     existing = next((l for l in ctx.store.lots.values()
                      if l.farmer_id == a.farmer_id and l.commodity_id == a.commodity_id and l.status == "available"), None)
+    if a.farmer_id not in ctx.store.farmers:
+        raise ValueError(f"unknown farmer {a.farmer_id}")
+    if existing is None:
+        existing = next((l for l in ctx.store.lots.values()
+                         if l.farmer_id == a.farmer_id and l.commodity_id == a.commodity_id and l.status == "committed"), None)
     lot = existing or Lot(ctx.store.new_id("lot"), a.farmer_id, a.commodity_id, a.quantity_kg, a.grade, a.ready_date)
+    if a.quantity_kg < lot.committed_kg:
+        raise ValueError(f"{lot.committed_kg} kg of this lot is already committed under agreements; "
+                         "report the shortfall to the Orchestrator so it can re-plan")
     lot.quantity_kg, lot.grade, lot.ready_date = a.quantity_kg, a.grade, a.ready_date
     ctx.store.lots[lot.id] = lot
-    return {"lot": vars(lot), "data_kind": "reported"}
+    return {"lot": {**vars(lot), "available_kg": lot.available_kg}, "data_kind": "reported"}
 
 
 async def detect_surplus(ctx: ToolContext, a: SurplusInput) -> dict:
@@ -236,8 +244,8 @@ async def match_lot_to_requirement(ctx: ToolContext, a: MatchInput) -> dict:
     km = distance_km(farmer.lat, farmer.lon, req.delivery_lat, req.delivery_lon)
     return {
         "requirement_id": req.id, "buyer_name": req.buyer_name, "price_per_kg": req.price_per_kg,
-        "required_kg": req.quantity_kg, "lot_kg": lot.quantity_kg,
-        "shortfall_kg": max(0.0, req.quantity_kg - lot.quantity_kg),
+        "required_kg": req.quantity_kg, "lot_kg": lot.available_kg,
+        "shortfall_kg": max(0.0, req.quantity_kg - lot.available_kg),
         "grade_ok": grade_meets(lot.grade, req.min_grade),
         "window_ok": req.window_start <= lot.ready_date <= req.window_end,
         "delivery_distance_km": round(km, 1),
@@ -310,12 +318,12 @@ async def find_compatible_lots(ctx: ToolContext, a: CompatibleLotsInput) -> dict
     af = ctx.store.farmers[anchor.farmer_id]
     out = []
     for lot in ctx.store.lots.values():
-        if lot.id == anchor.id or lot.status != "available" or lot.commodity_id != anchor.commodity_id:
+        if lot.id == anchor.id or lot.available_kg <= 0 or lot.commodity_id != anchor.commodity_id:
             continue
         f = ctx.store.farmers[lot.farmer_id]
         km = distance_km(af.lat, af.lon, f.lat, f.lon)
         if km <= a.radius_km and grade_meets(lot.grade, a.min_grade) and abs((lot.ready_date - anchor.ready_date).days) <= a.max_ready_gap_days:
-            out.append({"lot_id": lot.id, "farmer_id": f.id, "quantity_kg": lot.quantity_kg, "grade": lot.grade,
+            out.append({"lot_id": lot.id, "farmer_id": f.id, "quantity_kg": lot.available_kg, "grade": lot.grade,
                         "ready_date": lot.ready_date.isoformat(), "distance_km": round(km, 1)})
     return {"compatible_lots": sorted(out, key=lambda x: x["distance_km"]), "data_kind": "simulated"}
 
@@ -324,14 +332,22 @@ async def aggregate_lots(ctx: ToolContext, a: AggregateInput) -> dict:
     """Greedy nearest-first fill. Production replaces this with the OR-Tools CP-SAT model."""
     anchor = ctx.store.lots[a.anchor_lot_id]
     af = ctx.store.farmers[anchor.farmer_id]
-    selected = [{"lot_id": anchor.id, "farmer_id": anchor.farmer_id, "quantity_kg": anchor.quantity_kg}]
-    total = anchor.quantity_kg
-    cands = sorted((ctx.store.lots[i] for i in a.candidate_lot_ids),
+    candidates = []
+    for lot_id in dict.fromkeys(a.candidate_lot_ids):  # de-duplicate, keep order
+        lot = ctx.store.lots.get(lot_id)
+        if lot is None or lot.id == anchor.id:
+            raise ValueError(f"invalid candidate lot {lot_id}")
+        if lot.commodity_id != anchor.commodity_id or lot.available_kg <= 0:
+            raise ValueError(f"lot {lot_id} is not an available lot of the same crop")
+        candidates.append(lot)
+    selected = [{"lot_id": anchor.id, "farmer_id": anchor.farmer_id, "quantity_kg": anchor.available_kg}]
+    total = anchor.available_kg
+    cands = sorted(candidates,
                    key=lambda l: distance_km(af.lat, af.lon, ctx.store.farmers[l.farmer_id].lat, ctx.store.farmers[l.farmer_id].lon))
     for lot in cands:
         if total >= a.target_kg:
             break
-        take = min(lot.quantity_kg, a.target_kg - total)
+        take = min(lot.available_kg, a.target_kg - total)
         selected.append({"lot_id": lot.id, "farmer_id": lot.farmer_id, "quantity_kg": take})
         total += take
     return {"selected": selected, "total_kg": total, "target_kg": a.target_kg,
@@ -339,6 +355,18 @@ async def aggregate_lots(ctx: ToolContext, a: AggregateInput) -> dict:
 
 
 async def pro_rata_split(ctx: ToolContext, a: ProRataInput) -> dict:
+    if not a.members:
+        raise ValueError("no members to split between")
+    seen = set()
+    for m in a.members:
+        lot = ctx.store.lots.get(m.lot_id)
+        if lot is None or lot.farmer_id != m.farmer_id:
+            raise ValueError(f"lot {m.lot_id} does not belong to {m.farmer_id}")
+        if m.lot_id in seen:
+            raise ValueError(f"lot {m.lot_id} listed twice")
+        seen.add(m.lot_id)
+        if m.quantity_kg > lot.available_kg + 1e-6:
+            raise ValueError(f"{m.quantity_kg} kg exceeds the {lot.available_kg} kg available in {m.lot_id}")
     total = sum(m.quantity_kg for m in a.members)
     rows = []
     for m in a.members:
@@ -412,8 +440,10 @@ async def available_vehicles(ctx: ToolContext, a: VehiclesInput) -> dict:
 async def route_pickups(ctx: ToolContext, a: RouteInput) -> dict:
     """Nearest-neighbour route. Production uses the OR-Tools routing solver on OSRM road distances."""
     v = ctx.store.vehicles[a.vehicle_id]
-    lots = [ctx.store.lots[i] for i in a.lot_ids]
-    load = sum(l.quantity_kg for l in lots)
+    lots = [ctx.store.lots[i] for i in dict.fromkeys(a.lot_ids)]
+    if not lots:
+        raise ValueError("no lots to pick up")
+    load = sum(l.available_kg for l in lots)
     if load > v.capacity_kg:
         raise ValueError(f"load {load} kg exceeds vehicle capacity {v.capacity_kg} kg")
     pos, order, km = (v.base_lat, v.base_lon), [], 0.0
@@ -477,11 +507,11 @@ class PriceTrendInput(BaseModel):
 
 class HoldVsSellInput(BaseModel):
     quantity_kg: float = Field(gt=0)
-    sell_now_net_per_kg: float
+    sell_now_net_per_kg: float = Field(description="From Market Intelligence's report")
     storage_id: str
+    market_id: str = Field(description="Market whose price history sets the scenarios")
+    commodity_id: str
     days: int = Field(ge=1, le=60)
-    price_change_pct_low: float
-    price_change_pct_high: float
 
 
 async def storage_options(ctx: ToolContext, a: StorageOptionsInput) -> dict:
@@ -491,26 +521,61 @@ async def storage_options(ctx: ToolContext, a: StorageOptionsInput) -> dict:
     return {"storage": out}
 
 
+MIN_HISTORY = 10
+
+
+def _history(store, commodity_id: str, market_id: str):
+    rows = sorted((p for p in store.prices if p.commodity_id == commodity_id and p.market_id == market_id), key=lambda p: p.date)
+    by_day = {p.date: float(p.modal_price_per_kg) for p in rows}  # one value per day
+    return sorted(by_day.items())
+
+
+def _change_scenarios(history: list[tuple[date, float]], days: int) -> tuple[float, float] | None:
+    """Low/high price change over `days`, from the 10th and 90th percentile of observed changes over the
+    same horizon. Taken from data only; None when there isn't enough history."""
+    if len(history) < MIN_HISTORY:
+        return None
+    changes = []
+    for i, (d0, p0) in enumerate(history):
+        later = [p for d, p in history[i + 1:] if (d - d0).days == days]
+        if later and p0 > 0:
+            changes.append((later[0] - p0) / p0 * 100)
+    if len(changes) < 5:
+        return None
+    changes.sort()
+    pick = lambda q: changes[min(len(changes) - 1, max(0, round(q * (len(changes) - 1))))]  # noqa: E731
+    return pick(0.1), pick(0.9)
+
+
 async def price_trend(ctx: ToolContext, a: PriceTrendInput) -> dict:
-    rows = sorted((p for p in ctx.store.prices if p.commodity_id == a.commodity_id and p.market_id == a.market_id), key=lambda p: p.date)
-    if len(rows) < 10:
-        return {"enough_history": False, "observations": len(rows),
-                "note": "fewer than 10 observations: no trend can be estimated; do not recommend storage on a forecast"}
-    first, last = rows[0], rows[-1]
-    change = float((last.modal_price_per_kg - first.modal_price_per_kg) / first.modal_price_per_kg * 100)
-    return {"enough_history": True, "observations": len(rows), "change_pct_over_period": round(change, 1),
-            "from": first.date.isoformat(), "to": last.date.isoformat(), "data_kind": "historical"}
+    history = _history(ctx.store, a.commodity_id, a.market_id)
+    if len(history) < MIN_HISTORY:
+        return {"enough_history": False, "observations": len(history),
+                "note": f"fewer than {MIN_HISTORY} days of prices: no trend can be estimated; do not recommend storage on a forecast"}
+    (d0, p0), (d1, p1) = history[0], history[-1]
+    return {"enough_history": True, "observations": len(history), "change_pct_over_period": round((p1 - p0) / p0 * 100, 1),
+            "from": d0.isoformat(), "to": d1.isoformat(), "data_kind": "historical"}
 
 
 async def hold_vs_sell(ctx: ToolContext, a: HoldVsSellInput) -> dict:
+    """Price scenarios come from observed history, never from the agent, so storage advice can't rest on a guess."""
     s = ctx.store.storage[a.storage_id]
+    if s.commodity_id != a.commodity_id:
+        raise ValueError(f"storage {s.id} is not set up for {a.commodity_id}")
+    sell_now = a.quantity_kg * a.sell_now_net_per_kg
+    scenarios = _change_scenarios(_history(ctx.store, a.commodity_id, a.market_id), a.days)
+    if scenarios is None:
+        return {"enough_history": False, "sell_now_net_inr": round(sell_now, 2),
+                "note": "not enough price history for this horizon; recommend selling now (insufficient_data)"}
+    low_pct, high_pct = scenarios
     kept = a.quantity_kg * (1 - s.spoilage_pct_per_day / 100) ** a.days
     cost = a.quantity_kg * s.cost_per_kg_per_day * a.days
-    sell_now = a.quantity_kg * a.sell_now_net_per_kg
-    low = kept * a.sell_now_net_per_kg * (1 + a.price_change_pct_low / 100) - cost
-    high = kept * a.sell_now_net_per_kg * (1 + a.price_change_pct_high / 100) - cost
-    return {"sell_now_net_inr": round(sell_now, 2), "store_net_inr_low": round(low, 2), "store_net_inr_high": round(high, 2),
-            "kg_left_after_spoilage": round(kept, 1), "storage_cost_inr": round(cost, 2), "data_kind": "computed"}
+    low = kept * a.sell_now_net_per_kg * (1 + low_pct / 100) - cost
+    high = kept * a.sell_now_net_per_kg * (1 + high_pct / 100) - cost
+    return {"enough_history": True, "sell_now_net_inr": round(sell_now, 2), "store_net_inr_low": round(low, 2),
+            "store_net_inr_high": round(high, 2), "price_change_pct_low": round(low_pct, 1),
+            "price_change_pct_high": round(high_pct, 1), "kg_left_after_spoilage": round(kept, 1),
+            "storage_cost_inr": round(cost, 2), "data_kind": "computed from historical prices"}
 
 
 class StorageResult(BaseModel):
@@ -538,7 +603,7 @@ STORAGE_DECISION = AgentDefinition(
     ],
     system_prompt=f"""You are the Storage Decision agent in KisanSetu.
 Your job: decide whether the farmer should sell now or store and sell later.
-Check storage options and price history. Only use price-change scenarios that come from price_trend; if there isn't enough history, recommend selling now with recommendation "insufficient_data" rather than guessing.
+Check storage options and price history, then call hold_vs_sell, which derives the price scenarios from observed history itself. If it reports not enough history, recommend selling now with recommendation "insufficient_data" rather than guessing.
 Recommend storing only if even the low scenario beats selling now.
 {COMMON_RULES}""",
 )
@@ -548,11 +613,7 @@ Recommend storing only if even the low scenario beats selling now.
 # Transaction and Trust
 # ---------------------------------------------------------------------------------------------
 class AgreementInput(BaseModel):
-    farmer_id: str
-    counterparty: str
-    quantity_kg: float = Field(gt=0)
-    price_per_kg: float = Field(ge=0)
-    pickup_date: date
+    farmer_id: str = Field(description="Farmer whose approved proposal becomes the agreement")
 
 
 class DeliveryInput(BaseModel):
@@ -563,15 +624,39 @@ class DeliveryInput(BaseModel):
 
 
 async def create_agreement_draft(ctx: ToolContext, a: AgreementInput) -> dict:
+    """Terms are copied from the farmer's approved proposal, so an agreement can never differ from
+    what the farmer approved. One agreement per approval; the lot quantity is reserved."""
     approval = ctx.workflow.require_approved(a.farmer_id)  # guardrail: no approval, no agreement
+    farmer = ctx.store.farmers[a.farmer_id]
+    if not farmer.consent_share_with_buyers:
+        raise PermissionError(f"farmer {a.farmer_id} has not consented to share details with buyers")
+    existing = next((x for x in ctx.store.agreements.values()
+                     if x["approval_id"] == approval.id and x["status"] != "voided"), None)
+    if existing:
+        return {"agreement": existing, "note": "already drafted for this approval"}
+    p = approval.proposal
+    lot = ctx.store.lots[p["lot_id"]]
+    if p["quantity_kg"] > lot.available_kg + 1e-6:
+        raise ValueError(f"lot {lot.id} has only {lot.available_kg} kg available; re-plan with the farmer")
+    lot.committed_kg += p["quantity_kg"]
+    lot.status = "committed"
     agreement_id = ctx.store.new_id("agr")
-    ctx.store.agreements[agreement_id] = {**a.model_dump(mode="json"), "id": agreement_id, "approval_id": approval.id,
-                                          "workflow_id": ctx.workflow.id, "status": "draft"}
+    ctx.store.agreements[agreement_id] = {
+        "id": agreement_id, "workflow_id": ctx.workflow.id, "approval_id": approval.id, "status": "draft",
+        "farmer_id": a.farmer_id, "lot_id": lot.id, "counterparty": p["sell_to"], "price_basis": p["price_basis"],
+        "quantity_kg": p["quantity_kg"], "price_per_kg": p["expected_price_per_kg"], "pickup_date": p["pickup_date"],
+    }
     return {"agreement": ctx.store.agreements[agreement_id]}
 
 
 async def record_delivery(ctx: ToolContext, a: DeliveryInput) -> dict:
     agr = ctx.store.agreements[a.agreement_id]
+    if agr["workflow_id"] != ctx.workflow.id:
+        raise PermissionError("agreement belongs to another workflow")
+    if agr["status"] != "draft":
+        raise ValueError(f"agreement is {agr['status']}; only a draft agreement can record a delivery")
+    if a.accepted_kg > a.delivered_kg:
+        raise ValueError("accepted quantity cannot exceed delivered quantity")
     rec = {**a.model_dump(mode="json"), "agreed_kg": agr["quantity_kg"],
            "shortfall_kg": round(agr["quantity_kg"] - a.delivered_kg, 2),
            "rejected_kg": round(a.delivered_kg - a.accepted_kg, 2),
@@ -597,7 +682,7 @@ TRANSACTION_AND_TRUST = AgentDefinition(
     effort="low",
     output_model=TransactionReport,
     tools=[
-        ToolSpec("create_agreement_draft", "Draft an agreement for a farmer whose proposal is approved. Fails without approval.", AgreementInput, create_agreement_draft),
+        ToolSpec("create_agreement_draft", "Draft the agreement for a farmer's approved proposal (terms come from the proposal). Fails without approval or consent.", AgreementInput, create_agreement_draft),
         ToolSpec("record_delivery", "Record delivered and accepted quantities against an agreement.", DeliveryInput, record_delivery),
     ],
     system_prompt=f"""You are the Transaction and Trust agent in KisanSetu.

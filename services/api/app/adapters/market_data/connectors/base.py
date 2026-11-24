@@ -25,7 +25,8 @@ class ConnectorContext:
     http_transport: httpx.AsyncBaseTransport | None = None  # injected in tests
 
     def http_client(self, timeout: float) -> httpx.AsyncClient:
-        return httpx.AsyncClient(transport=self.http_transport, timeout=timeout, follow_redirects=True)
+        # No redirects: a redirect could point an admin-approved URL at an internal address.
+        return httpx.AsyncClient(transport=self.http_transport, timeout=timeout, follow_redirects=False)
 
 
 class Connector(Protocol):

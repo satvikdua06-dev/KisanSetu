@@ -103,6 +103,7 @@ class SourceConfig(BaseModel):
     request: RequestConfig = Field(default_factory=RequestConfig)
     mapping: dict[str, FieldMapping]
     incremental: IncrementalConfig | None = None
+    max_price_per_kg: Decimal = Field(default=Decimal(1000), gt=0, description="Sanity limit; rows above it are rejected")
 
     @model_validator(mode="after")
     def _check_mapping(self) -> "SourceConfig":
@@ -112,6 +113,13 @@ class SourceConfig(BaseModel):
         missing = REQUIRED_TARGETS - set(self.mapping)
         if missing:
             raise ValueError(f"mapping must cover {sorted(missing)}")
+        for target in ("min_price", "max_price", "modal_price"):
+            spec = self.mapping.get(target)
+            if spec is None:
+                continue
+            # A missing unit is the classic 100x error (quintal read as kg), so it must be explicit.
+            if spec.parse != "number" or spec.unit is None:
+                raise ValueError(f"{target} must use parse: number and an explicit unit (e.g. INR_per_quintal)")
         return self
 
 
@@ -142,6 +150,10 @@ class PriceObservation(BaseModel):
         lo, hi = self.min_price_per_kg, self.max_price_per_kg
         if lo is not None and hi is not None and lo > hi:
             raise ValueError("min price is above max price")
+        if lo is not None and self.modal_price_per_kg < lo or hi is not None and self.modal_price_per_kg > hi:
+            raise ValueError("modal price is outside the min-max range")
+        if self.modal_price_per_kg == 0:
+            raise ValueError("modal price is zero")
         return self
 
 

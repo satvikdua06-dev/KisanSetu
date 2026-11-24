@@ -106,7 +106,7 @@ async def test_sql_source_reads_external_database(tmp_path):
         "name": "fpo-db", "connector": "sql", "data_kind": "observed",
         "request": {"dsn_secret": "FPO_DB", "query": "SELECT mandi, crop, rate_per_kg, rate_date FROM daily_rates WHERE rate_date > :watermark"},
         "mapping": {"market": {"from": "mandi"}, "commodity": {"from": "crop"},
-                    "modal_price": {"from": "rate_per_kg", "parse": "number"}, "date": {"from": "rate_date", "parse": "date"}},
+                    "modal_price": {"from": "rate_per_kg", "parse": "number", "unit": "INR_per_kg"}, "date": {"from": "rate_date", "parse": "date"}},
     })
     result = await run_source(config, aliases=ALIASES, secrets=DictSecretReader({"FPO_DB": f"sqlite:///{db}"}),
                               since=date(2026, 11, 21))
@@ -118,7 +118,8 @@ async def test_sql_source_refuses_write_queries():
     config = SourceConfig.model_validate({
         "name": "bad-db", "connector": "sql", "data_kind": "observed",
         "request": {"dsn_secret": "X", "query": "DELETE FROM daily_rates"},
-        "mapping": {"market": {"from": "a"}, "commodity": {"from": "b"}, "modal_price": {"from": "c"}, "date": {"from": "d"}},
+        "mapping": {"market": {"from": "a"}, "commodity": {"from": "b"}, "date": {"from": "d"},
+                    "modal_price": {"from": "c", "parse": "number", "unit": "INR_per_kg"}},
     })
     result = await run_source(config, aliases=ALIASES, secrets=DictSecretReader({"X": "sqlite://"}))
     assert result.error and "read-only" in result.error
@@ -131,7 +132,7 @@ async def test_plugin_source():
 
     config = SourceConfig.model_validate({
         "name": "portal", "connector": "plugin", "data_kind": "observed", "request": {"plugin": "test-portal"},
-        "mapping": {"market": {"from": "m"}, "commodity": {"from": "c"}, "modal_price": {"from": "p", "parse": "number"},
+        "mapping": {"market": {"from": "m"}, "commodity": {"from": "c"}, "modal_price": {"from": "p", "parse": "number", "unit": "INR_per_kg"},
                     "date": {"from": "d", "parse": "date"}},
     })
     result = await run_source(config, aliases=ALIASES)

@@ -53,6 +53,8 @@ class Approval(BaseModel):
     proposal: dict[str, Any]
     status: ApprovalStatus = ApprovalStatus.PENDING
     decided_at: datetime | None = None
+    decided_by: str | None = None  # the farmer, or "coordinator:<fpo_id>" acting on recorded farmer confirmation
+    confirmation_ref: str | None = None  # e.g. call recording or signed slip id when a coordinator decides
     note: str | None = None
 
 
@@ -73,6 +75,7 @@ class WorkflowState(BaseModel):
     sections: dict[str, dict[str, Any]] = Field(default_factory=dict)
     tasks: dict[str, AgentTask] = Field(default_factory=dict)
     approvals: dict[str, Approval] = Field(default_factory=dict)
+    usage: dict[str, int] = Field(default_factory=dict)  # model tokens spent on this workflow
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # --- blackboard -------------------------------------------------------------
@@ -97,13 +100,26 @@ class WorkflowState(BaseModel):
         self.status = WorkflowStatus.AWAITING_APPROVAL
         return approval
 
-    def decide(self, approval_id: str, approved: bool, note: str | None = None) -> Approval:
-        """Called only from the farmer-facing API (app, SMS, voice call, or coordinator with recorded consent)."""
-        approval = self.approvals[approval_id]
+    def decide(self, approval_id: str, approved: bool, *, decided_by: str, coordinator_for: str | None = None,
+               confirmation_ref: str | None = None, note: str | None = None) -> Approval:
+        """Only the farmer, or their FPO coordinator with a recorded confirmation from the farmer, can decide.
+
+        `coordinator_for` is the farmer's FPO id, passed by the caller after checking it in the store.
+        """
+        approval = self.approvals.get(approval_id)
+        if approval is None:
+            raise ApprovalRequiredError(f"unknown approval {approval_id}")
         if approval.status != ApprovalStatus.PENDING:
             raise ApprovalRequiredError(f"approval {approval_id} is {approval.status}, not pending")
+        if decided_by != approval.farmer_id:
+            if not (coordinator_for and decided_by == f"coordinator:{coordinator_for}"):
+                raise ApprovalRequiredError(f"{decided_by} may not decide for {approval.farmer_id}")
+            if not confirmation_ref:
+                raise ApprovalRequiredError("a coordinator decision needs a confirmation_ref recording the farmer's answer")
         approval.status = ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED
         approval.decided_at = datetime.now(UTC)
+        approval.decided_by = decided_by
+        approval.confirmation_ref = confirmation_ref
         approval.note = note
         if not self.pending_approvals():
             self.status = WorkflowStatus.RUNNING

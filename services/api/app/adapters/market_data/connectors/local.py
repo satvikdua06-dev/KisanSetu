@@ -2,6 +2,7 @@
 
 import asyncio
 import csv
+import os
 import re
 from collections.abc import AsyncIterator, Callable
 from datetime import date
@@ -14,7 +15,18 @@ from app.adapters.market_data.connectors.base import ConnectorConfigError, Conne
 from app.adapters.market_data.models import SourceConfig
 
 _READ_ONLY = re.compile(r"^\s*(select|with)\b", re.IGNORECASE)
-_WRITE_WORDS = re.compile(r"\b(insert|update|delete|drop|alter|create|truncate|grant|merge|call)\b", re.IGNORECASE)
+_WRITE_WORDS = re.compile(
+    r"\b(insert|update|delete|drop|alter|create|truncate|grant|revoke|merge|call|exec|execute|into|copy|attach|pragma|lock)\b",
+    re.IGNORECASE,
+)
+# Defence in depth only: the DSN must also use a read-only database user.
+
+_API_ROOT = Path(__file__).resolve().parents[4]
+
+
+def file_root() -> Path:
+    """Directory file sources may read from (uploads and seeded simulations), nothing outside it."""
+    return Path(os.environ.get("MARKET_DATA_FILE_ROOT", _API_ROOT / "config")).resolve()
 
 
 @register("sql")
@@ -25,7 +37,10 @@ class SqlConnector:
         req = config.request
         if not req.dsn_secret or not req.query:
             raise ConnectorConfigError("sql source needs request.dsn_secret and request.query")
-        if not _READ_ONLY.match(req.query) or _WRITE_WORDS.search(req.query):
+        query = req.query.strip().rstrip(";")
+        if ";" in query or "--" in query or "/*" in query:
+            raise ConnectorConfigError("sql source query must be a single read-only SELECT (no ';' or comments)")
+        if not _READ_ONLY.match(query) or _WRITE_WORDS.search(query):
             raise ConnectorConfigError("sql source query must be a single read-only SELECT")
 
     async def fetch(
@@ -63,12 +78,22 @@ class FileConnector:
             raise ConnectorConfigError("file source needs request.path")
         if not path.lower().endswith(".csv"):
             raise ConnectorConfigError("file source supports .csv (Excel support is planned)")
+        self._resolve(path)
+
+    @staticmethod
+    def _resolve(path: str) -> Path:
+        root = file_root()
+        candidate = Path(path)
+        resolved = (candidate if candidate.is_absolute() else root.parent / candidate).resolve()
+        if not resolved.is_relative_to(root):
+            raise ConnectorConfigError(f"file sources must live under {root}")
+        return resolved
 
     async def fetch(
         self, config: SourceConfig, ctx: ConnectorContext, since: date | None, limit: int | None
     ) -> AsyncIterator[dict[str, Any]]:
         self.validate_config(config)
-        path = Path(config.request.path)
+        path = self._resolve(config.request.path)
         if not path.is_file():
             raise ConnectorConfigError(f"file not found: {path}")
         with path.open(newline="", encoding="utf-8-sig") as f:

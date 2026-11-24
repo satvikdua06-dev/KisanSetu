@@ -1,12 +1,53 @@
 """Generic HTTP connectors: any JSON or CSV API, configured, not coded."""
 
+import asyncio
 import csv
 import io
+import ipaddress
+import os
+import socket
 from collections.abc import AsyncIterator
 from datetime import date
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
+
+_BLOCKED_SUFFIXES = (".local", ".internal", ".localhost")
+
+
+def _private_hosts_allowed() -> bool:
+    return os.environ.get("MARKET_SOURCES_ALLOW_PRIVATE_HOSTS") == "1"
+
+
+def _is_internal(ip: str) -> bool:
+    addr = ipaddress.ip_address(ip)
+    return addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved or addr.is_multicast or addr.is_unspecified
+
+
+async def check_public_host(url: str) -> None:
+    """Refuse URLs that point inside our network (cloud metadata, databases, admin ports).
+
+    Set MARKET_SOURCES_ALLOW_PRIVATE_HOSTS=1 only for a source deliberately hosted on a private network.
+    """
+    if _private_hosts_allowed():
+        return
+    host = (urlsplit(url).hostname or "").lower()
+    if not host or host == "localhost" or host.endswith(_BLOCKED_SUFFIXES):
+        raise ConnectorConfigError(f"host '{host}' is not allowed")
+    try:
+        if _is_internal(host):
+            raise ConnectorConfigError(f"address {host} is internal and not allowed")
+        return  # a public IP literal
+    except ValueError:
+        pass  # a name, resolve it below
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        return  # unresolvable: the request itself will fail
+    for info in infos:
+        if _is_internal(info[4][0]):
+            raise ConnectorConfigError(f"host '{host}' resolves to an internal address and is not allowed")
 
 from app.adapters.market_data.connectors.base import ConnectorConfigError, ConnectorContext, register
 from app.adapters.market_data.mapping import get_path
@@ -54,6 +95,7 @@ class _HttpConnector:
     ) -> AsyncIterator[dict[str, Any]]:
         self.validate_config(config)
         req = config.request
+        await check_public_host(req.url)
         pag = req.pagination
         auth_params, auth_headers, basic = _auth(config, ctx)
         params = {**_base_params(config, since), **auth_params}
@@ -74,6 +116,9 @@ class _HttpConnector:
                     page_params[pag.cursor_param] = cursor
 
                 response = await client.request(req.method, req.url, params=page_params, headers=headers, auth=basic)
+                if response.is_redirect:
+                    raise ConnectorConfigError(f"source answered with a redirect ({response.status_code}); "
+                                               "put the final URL in the config")
                 response.raise_for_status()
                 records, body = self._records(response, config)
 

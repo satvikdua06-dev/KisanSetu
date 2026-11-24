@@ -3,14 +3,15 @@
 Saving and enabling sources needs the database layer (next step); the dry run works now.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.adapters.market_data.aliases import AliasResolver
 from app.adapters.market_data.connectors import ConnectorConfigError, available_connectors
 from app.adapters.market_data.engine import dry_run, validate_source
 from app.adapters.market_data.models import IngestResult, SourceConfig
+from app.api.security import require_admin
 
-router = APIRouter(prefix="/admin/market-sources", tags=["market sources"])
+router = APIRouter(prefix="/admin/market-sources", tags=["market sources"], dependencies=[Depends(require_admin)])
 
 
 @router.get("/connectors")

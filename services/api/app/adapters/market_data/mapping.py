@@ -60,6 +60,10 @@ def map_record(record: dict[str, Any], config: SourceConfig, fetched_at: datetim
     values: dict[str, Any] = {}
     for target, spec in config.mapping.items():
         values[target] = _parse(get_path(record, spec.from_), spec, target)
+    for target in _PRICE_TARGETS:
+        price = values.get(target)
+        if price is not None and price > config.max_price_per_kg:
+            raise MappingError(f"{target}: {price} INR/kg is above the sanity limit {config.max_price_per_kg}; check the unit")
     try:
         return PriceObservation(
             source=config.name,

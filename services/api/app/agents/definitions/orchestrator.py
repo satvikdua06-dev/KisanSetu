@@ -37,7 +37,9 @@ class PlanInput(BaseModel):
 
 class Proposal(BaseModel):
     summary: str = Field(description="Plain-language summary the farmer will hear or read")
-    sell_to: str = Field(description="Buyer or market")
+    sell_to: str = Field(description="Buyer or market name, exactly as in the specialist's report")
+    price_basis: str = Field(description="Where the price comes from: 'buyer:<requirement_id>' or 'market:<market_id>'")
+    lot_id: str = Field(description="The farmer's lot this sale draws from")
     quantity_kg: float = Field(gt=0)
     expected_price_per_kg: float = Field(ge=0)
     net_per_kg_low: float
@@ -45,6 +47,7 @@ class Proposal(BaseModel):
     net_per_kg_high: float
     expected_net_total_inr: float
     transport_cost_per_kg: float = Field(ge=0)
+    other_costs_per_kg: float = Field(ge=0, description="Handling, fees, expected deductions, per kg")
     deductions_note: str
     pickup_date: date
     alternative_considered: str = Field(description="The best option the farmer is giving up, with its net")
@@ -77,9 +80,64 @@ async def update_plan(ctx: ToolContext, a: PlanInput) -> dict:
     return {"plan": a.steps}
 
 
+_PRICE_TOL = 0.01  # INR/kg
+_NET_TOL = 0.05  # INR/kg, rounding in reports
+
+
+class ProposalCheckError(ValueError):
+    pass
+
+
+def check_proposal(ctx: ToolContext, farmer_id: str, p: Proposal) -> None:
+    """Deterministic checks so a proposal can't carry invented or inconsistent numbers.
+
+    - the lot is this farmer's and has the quantity available;
+    - the price is traceable to a real buyer requirement or a market observation in the store;
+    - net = price - transport - other costs, low <= expected <= high, total = net x quantity.
+    """
+    store = ctx.store
+    if farmer_id not in store.farmers:
+        raise ProposalCheckError(f"unknown farmer {farmer_id}")
+    lot = store.lots.get(p.lot_id)
+    if lot is None or lot.farmer_id != farmer_id:
+        raise ProposalCheckError(f"lot {p.lot_id} does not belong to {farmer_id}")
+    if p.quantity_kg > lot.available_kg + 1e-6:
+        raise ProposalCheckError(f"quantity {p.quantity_kg} kg exceeds the {lot.available_kg} kg available in {lot.id}")
+    if p.pickup_date < store.today:
+        raise ProposalCheckError("pickup date is in the past")
+
+    kind, _, ref = p.price_basis.partition(":")
+    if kind == "buyer":
+        req = store.buyer_requirements.get(ref)
+        if req is None or not req.active or req.commodity_id != lot.commodity_id:
+            raise ProposalCheckError(f"price basis {p.price_basis} is not an active requirement for this crop")
+        if abs(req.price_per_kg - p.expected_price_per_kg) > _PRICE_TOL:
+            raise ProposalCheckError(f"price {p.expected_price_per_kg} does not match {req.buyer_name}'s {req.price_per_kg}")
+        if p.sell_to != req.buyer_name:
+            raise ProposalCheckError(f"sell_to '{p.sell_to}' does not match the buyer '{req.buyer_name}'")
+    elif kind == "market":
+        obs = [o for o in store.prices if o.market_id == ref and o.commodity_id == lot.commodity_id]
+        if not obs:
+            raise ProposalCheckError(f"no price observations for market {ref}")
+        latest = max(obs, key=lambda o: o.date)
+        lo = float(latest.min_price_per_kg if latest.min_price_per_kg is not None else latest.modal_price_per_kg)
+        hi = float(latest.max_price_per_kg if latest.max_price_per_kg is not None else latest.modal_price_per_kg)
+        if not lo - _PRICE_TOL <= p.expected_price_per_kg <= hi + _PRICE_TOL:
+            raise ProposalCheckError(f"price {p.expected_price_per_kg} is outside the observed range {lo}-{hi} at {ref}")
+    else:
+        raise ProposalCheckError("price_basis must be 'buyer:<requirement_id>' or 'market:<market_id>'")
+
+    expected_net = p.expected_price_per_kg - p.transport_cost_per_kg - p.other_costs_per_kg
+    if abs(expected_net - p.net_per_kg_expected) > _NET_TOL:
+        raise ProposalCheckError(f"net per kg {p.net_per_kg_expected} != price - transport - other costs = {expected_net:.2f}")
+    if not p.net_per_kg_low <= p.net_per_kg_expected <= p.net_per_kg_high:
+        raise ProposalCheckError("net per kg must satisfy low <= expected <= high")
+    if abs(p.net_per_kg_expected * p.quantity_kg - p.expected_net_total_inr) > max(1.0, 0.001 * abs(p.expected_net_total_inr)):
+        raise ProposalCheckError(f"expected net total {p.expected_net_total_inr} != net per kg x quantity")
+
+
 async def request_approval(ctx: ToolContext, a: ApprovalInput) -> dict:
-    if a.farmer_id not in ctx.store.farmers:
-        raise ValueError(f"unknown farmer {a.farmer_id}")
+    check_proposal(ctx, a.farmer_id, a.proposal)
     approval = ctx.workflow.request_approval(a.farmer_id, a.proposal.model_dump(mode="json"))
     farmer = ctx.store.farmers[a.farmer_id]
     ctx.store.notifications.append({"farmer_id": a.farmer_id, "language": farmer.language, "approval_id": approval.id,
@@ -92,11 +150,29 @@ async def request_approval(ctx: ToolContext, a: ApprovalInput) -> dict:
             "note": "The workflow now waits for this farmer. Finish your turn; you will be resumed with the decision."}
 
 
+def void_workflow_agreements(store, workflow_id: str, reason: str) -> list[str]:
+    """Void draft agreements of a workflow and release the lot quantities they reserved."""
+    voided = []
+    for agr in store.agreements.values():
+        if agr["workflow_id"] == workflow_id and agr["status"] == "draft":
+            agr["status"], agr["void_reason"] = "voided", reason
+            lot = store.lots.get(agr["lot_id"])
+            if lot is not None:
+                lot.committed_kg = max(0.0, lot.committed_kg - agr["quantity_kg"])
+                if lot.committed_kg == 0 and lot.status == "committed":
+                    lot.status = "available"
+            voided.append(agr["id"])
+    return voided
+
+
 async def replan(ctx: ToolContext, a: ReasonInput) -> dict:
     ctx.workflow.supersede_all()
+    voided = void_workflow_agreements(ctx.store, ctx.workflow.id, a.reason)
     await ctx.log.append(AgentMessage(workflow_id=ctx.workflow.id, type=MessageType.NOTE, sender="orchestrator",
-                                      recipient="workflow", content={"summary": f"Re-planning: {a.reason}"}))
-    return {"superseded": "all earlier proposals; every affected farmer must approve the new one"}
+                                      recipient="workflow",
+                                      content={"summary": f"Re-planning: {a.reason}", "voided_agreements": voided}))
+    return {"superseded": "all earlier proposals; every affected farmer must approve the new one",
+            "voided_draft_agreements": voided}
 
 
 async def escalate_to_coordinator(ctx: ToolContext, a: ReasonInput) -> dict:
@@ -141,7 +217,7 @@ How to work:
 2. Delegate goals, not steps. Give each task clear constraints and acceptance criteria. Delegate independent tasks together so they run in parallel (for example market_intelligence and buyer_matching).
 3. Read every report critically. If a specialist escalates, decide how to resolve it, usually by bringing in another specialist (for example a buyer needs more than the farmer has: ask collective_selling to pool nearby lots, then logistics to plan pickups). If a report has low confidence or stale data, say so or ask again with tighter constraints.
 4. Compare the best options on expected net realisation for the farmer, never on headline price.
-5. When you have a concrete, costed option, send each affected farmer their own proposal with request_approval, including the best alternative they are giving up and which data is simulated. Then finish your turn: the workflow waits.
+5. When you have a concrete, costed option, send each affected farmer their own proposal with request_approval, including the best alternative they are giving up and which data is simulated. Set price_basis to the buyer requirement or market the price came from, and lot_id to the farmer's lot. request_approval checks the numbers against the data and rejects inconsistent proposals; fix the proposal rather than arguing with the check. Then finish your turn: the workflow waits.
 6. When resumed with approvals, delegate the agreements to transaction_and_trust. When resumed with an outside event (a buyer withdrew, a vehicle cancelled, a harvest came in short), call replan, re-investigate what changed, and send fresh proposals.
 7. If the agents cannot find a workable option, or something needs human judgement, use escalate_to_coordinator.
 
